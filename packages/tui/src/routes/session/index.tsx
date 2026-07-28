@@ -1550,6 +1550,9 @@ function AssistantMessage(props: { message: AssistantMessage; parts: Part[]; las
               <Show when={duration()}>
                 <span style={{ fg: theme.textMuted }}> · {Locale.duration(duration())}</span>
               </Show>
+              <Show when={ctx.showTimestamps() ? props.message.time.completed : undefined}>
+                {(completed) => <span style={{ fg: theme.textMuted }}> · {Locale.clock(completed())}</span>}
+              </Show>
               <Show when={props.message.error?.name === "MessageAbortedError"}>
                 <span style={{ fg: theme.textMuted }}> · interrupted</span>
               </Show>
@@ -1612,6 +1615,7 @@ function ReasoningPart(props: { last: boolean; part: ReasoningPart; message: Ass
             done={isDone()}
             title={summary().title}
             duration={isDone() ? Locale.duration(duration()) : undefined}
+            timestamp={ctx.showTimestamps() ? Locale.clock(props.part.time.start) : undefined}
           />
         </box>
         <Show when={(!inMinimal() || expanded()) && summary().body}>
@@ -1638,6 +1642,7 @@ function ReasoningHeader(props: {
   done: boolean
   title: string | null
   duration?: string
+  timestamp?: string
 }) {
   const { theme } = useTheme()
   const fg = () =>
@@ -1650,6 +1655,9 @@ function ReasoningHeader(props: {
       <Match when={!props.done}>
         <box flexDirection="row">
           <Spinner color={fg()}>{props.title ? "Thinking: " + props.title : "Thinking"}</Spinner>
+          <Show when={props.timestamp}>
+            <text fg={fg()}> · {props.timestamp}</text>
+          </Show>
         </box>
       </Match>
       <Match when={true}>
@@ -1658,7 +1666,7 @@ function ReasoningHeader(props: {
             <span>{props.open ? "- " : "+ "}</span>
           </Show>
           <span>Thought</span>
-          <Show when={props.title || props.duration}>
+          <Show when={props.title || props.duration || props.timestamp}>
             <span>: </span>
           </Show>
           <Show when={props.title}>
@@ -1668,6 +1676,12 @@ function ReasoningHeader(props: {
             <span>
               {props.title ? " · " : ""}
               {props.duration}
+            </span>
+          </Show>
+          <Show when={props.timestamp}>
+            <span>
+              {props.title || props.duration ? " · " : ""}
+              {props.timestamp}
             </span>
           </Show>
         </text>
@@ -1692,6 +1706,9 @@ function TextPart(props: { last: boolean; part: TextPart; message: AssistantMess
           fg={theme.markdownText}
           bg={theme.background}
         />
+        <Show when={ctx.showTimestamps() ? props.part.time?.start : undefined}>
+          {(started) => <text fg={theme.textMuted}>{Locale.clock(started())}</text>}
+        </Show>
       </box>
     </Show>
   )
@@ -1888,6 +1905,12 @@ function InlineTool(props: {
       failure={props.failure}
       spinner={props.spinner}
       separate={props.separate}
+      timestamp={
+        ctx.showTimestamps() && props.part.state.status !== "pending"
+          ? Locale.clock(props.part.state.time.start)
+          : undefined
+      }
+      timestampColor={theme.textMuted}
       onMouseOver={() => clickable() && setHover(true)}
       onMouseOut={() => setHover(false)}
       onMouseUp={() => {
@@ -1918,6 +1941,8 @@ export function InlineToolRow(props: {
   failure?: string
   spinner?: boolean
   separate?: boolean
+  timestamp?: string
+  timestampColor?: RGBA
   children: JSX.Element
   onMouseOver?: () => void
   onMouseOut?: () => void
@@ -1941,7 +1966,12 @@ export function InlineToolRow(props: {
     >
       <Switch>
         <Match when={props.spinner}>
-          <Spinner color={props.color} children={props.children} />
+          <box flexDirection="row">
+            <Spinner color={props.color} children={props.children} />
+            <Show when={props.timestamp}>
+              <text fg={props.timestampColor}> · {props.timestamp}</text>
+            </Show>
+          </box>
         </Match>
         <Match when={true}>
           <Show
@@ -1971,6 +2001,9 @@ export function InlineToolRow(props: {
               >
                 {props.failed && !props.complete ? (props.failure ?? props.children) : props.children}
               </text>
+              <Show when={props.timestamp}>
+                <text fg={props.timestampColor}> · {props.timestamp}</text>
+              </Show>
             </box>
           </Show>
         </Match>
@@ -1992,9 +2025,15 @@ function BlockTool(props: {
   spinner?: boolean
 }) {
   const { theme } = useTheme()
+  const ctx = use()
   const renderer = useRenderer()
   const [hover, setHover] = createSignal(false)
   const error = createMemo(() => (props.part?.state.status === "error" ? props.part.state.error : undefined))
+  const timestamp = createMemo<string | undefined>(() => {
+    if (!ctx.showTimestamps()) return undefined
+    if (!props.part || props.part.state.status === "pending") return undefined
+    return Locale.clock(props.part.state.time.start)
+  })
   return (
     <box
       ref={(el: BoxRenderable) => alwaysSeparate.add(el)}
@@ -2019,14 +2058,21 @@ function BlockTool(props: {
           <Show
             when={props.spinner}
             fallback={
-              <text paddingLeft={3} fg={theme.textMuted}>
-                {title()}
-              </text>
+              <box flexDirection="row" paddingLeft={3}>
+                <text fg={theme.textMuted}>{title()}</text>
+                <Show when={timestamp()}>{(value) => <text fg={theme.textMuted}> · {value()}</text>}</Show>
+              </box>
             }
           >
-            <Spinner color={theme.textMuted}>{title().replace(/^# /, "")}</Spinner>
+            <box flexDirection="row">
+              <Spinner color={theme.textMuted}>{title().replace(/^# /, "")}</Spinner>
+              <Show when={timestamp()}>{(value) => <text fg={theme.textMuted}> · {value()}</text>}</Show>
+            </box>
           </Show>
         )}
+      </Show>
+      <Show when={!props.title && timestamp()}>
+        <text fg={theme.textMuted}>{timestamp()}</text>
       </Show>
       {props.children}
       <Show when={error()}>

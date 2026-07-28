@@ -240,6 +240,20 @@ describe("TUI inline tool wrapping", () => {
     expect(frame).not.toContain("Read failed")
   })
 
+  test("renders an action timestamp on an inline tool row", async () => {
+    const frame = await renderFrame(
+      () => (
+        <InlineToolRow icon="→" complete={true} pending="" timestamp="03:04:05">
+          Read src/index.ts
+        </InlineToolRow>
+      ),
+      { width: 72, height: 3 },
+    )
+
+    expect(frame).toContain("Read src/index.ts")
+    expect(frame).toContain("03:04:05")
+  })
+
   test("filters malformed nested tool wire data", () => {
     expect(
       parseApplyPatchFiles([

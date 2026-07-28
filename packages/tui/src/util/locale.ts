@@ -7,9 +7,16 @@ export function time(input: number): string {
   return date.toLocaleTimeString(undefined, { timeStyle: "short" })
 }
 
+export function clock(input: number): string {
+  const date = new Date(input)
+  return [date.getHours(), date.getMinutes(), date.getSeconds()]
+    .map((value) => value.toString().padStart(2, "0"))
+    .join(":")
+}
+
 export function datetime(input: number): string {
   const date = new Date(input)
-  const localTime = time(input)
+  const localTime = clock(input)
   const localDate = date.toLocaleDateString()
   return `${localTime} · ${localDate}`
 }
@@ -21,7 +28,7 @@ export function todayTimeOrDateTime(input: number): string {
     date.getFullYear() === now.getFullYear() && date.getMonth() === now.getMonth() && date.getDate() === now.getDate()
 
   if (isToday) {
-    return time(input)
+    return clock(input)
   } else {
     return datetime(input)
   }
